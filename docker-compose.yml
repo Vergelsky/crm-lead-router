@@ -1,0 +1,42 @@
+services:
+  db:
+    image: alpine:latest
+    container_name: leads_crm_db
+    volumes:
+      - db_data:/data
+    command: sh -c "mkdir -p /data && chmod 777 /data && tail -f /dev/null"
+    restart: unless-stopped
+    networks:
+      - leads_crm_network
+
+  app:
+    build: .
+    container_name: leads_crm_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/app/data
+      - .:/app
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/leads_crm.db
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    depends_on:
+      - db
+    networks:
+      - leads_crm_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  leads_crm_network:
+    driver: bridge
+
